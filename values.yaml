@@ -17,7 +17,7 @@ secretproviderclass:
   SecretProvider: "aws"
   secretName: "erpnext-secrets"
   secrets:
-    - objectName: "dev/erpnext/secrets"
+    - objectName: "erpnext/secrets"
       keys:
         - path: "dbRootPassword"
           value: "db-root-password"
