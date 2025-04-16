@@ -43,7 +43,7 @@ spec:
               done;
               echo "sites/common_site_config.json found";
               echo "Waiting for database to be reachable...";
-              wait-for-it -t 180 $(DB_HOST):$(DB_PORT);
+              wait-for-it -t 60 $(DB_HOST):$(DB_PORT);
               echo "Database is reachable.";
           env:
             - name: "DB_HOST"
