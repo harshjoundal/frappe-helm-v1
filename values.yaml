@@ -294,8 +294,9 @@ persistence:
       - ReadWriteOnce
     # existingClaim: ""
     size: 8Gi
+    storageClass: "standard"
     # storageClass: "efs-sc-v2"
-    storageClass: "longhorn"
+    # storageClass: "longhorn"
 
 # Ingress
 ingress:
@@ -446,8 +447,6 @@ jobs:
     affinity: {}
 
 imagePullSecrets: []
-nameOverride: ""
-fullnameOverride: ""
 
 # ----------------------  Service Account  ----------------------
 # This servie
