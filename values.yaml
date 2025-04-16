@@ -78,7 +78,13 @@ nginx:
   service:
     type: ClusterIP
     port: 8080
-  resources: {}
+  resources: 
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
   annotations:
     scheduling.cast.ai/spot-percentage: "70"
   nodeSelector: {}
@@ -110,7 +116,13 @@ worker:
     service:
       type: ClusterIP
       port: 8000
-    resources: {}
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
     nodeSelector: {}
     annotations:
       scheduling.cast.ai/spot-percentage: "70"
