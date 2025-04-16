@@ -42,7 +42,8 @@ sitesConfig:
     #These apps will be installed while site creation 
     #also if we add new apps in future,it will install those apps
     # while site migration 
-    installApps: []
+    installApps:
+      - erpnext
     uninstallApps: #These apps will be uninstalled when uninstallApps job runs
       - helpdesk
     backup: # If enabled site will be backed up while backup job runs
