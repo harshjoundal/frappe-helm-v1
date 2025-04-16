@@ -12,7 +12,7 @@
 # dbRds: true
 
 secretproviderclass:
-  enabled: true
+  enabled: false
   SecretProviderName: "erpnext-spc"
   SecretProvider: "aws"
   secretName: "erpnext-secrets"
