@@ -1,0 +1,21 @@
+apiVersion: v2
+appVersion: v14.40.0
+dependencies:
+- alias: redis-cache
+  condition: redis-cache.enabled
+  name: redis
+  repository: https://charts.bitnami.com/bitnami
+  version: 17.15.2
+- alias: redis-queue
+  condition: redis-queue.enabled
+  name: redis
+  repository: https://charts.bitnami.com/bitnami
+  version: 17.15.2
+# - condition: mariadb.enabled
+#   name: mariadb
+#   repository: https://charts.bitnami.com/bitnami
+#   version: 11.5.7
+description: Kubernetes Helm Chart for Frappe applications
+name: frappe-erpnext
+type: application
+version: 1.0.0

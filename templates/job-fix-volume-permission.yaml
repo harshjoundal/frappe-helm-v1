@@ -1,0 +1,69 @@
+{{- if .Values.jobs.volumePermissions.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "erpnext.fullname" . }}-vol-fix
+  labels:
+    {{- include "erpnext.labels" . | nindent 4 }}
+  {{- if .Values.jobs.volumePermissions.annotations }}
+  {{- with .Values.jobs.volumePermissions.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end}}
+spec:
+  backoffLimit: {{ .Values.jobs.volumePermissions.backoffLimit }}
+  template:
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      serviceAccountName: {{ template "erpnext.serviceAccountName" $ }}
+      securityContext:
+        {{- toYaml $.Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: frappe-bench-ownership
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ['sh', '-c']
+        args:
+          - >
+            chown -R \
+              "{{ default 1000 .Values.securityContext.runAsUser }}:{{ default 1000 .Values.securityContext.runAsUser }}" \
+              /home/frappe/frappe-bench
+        resources:
+          {{- toYaml .Values.jobs.volumePermissions.resources | nindent 10 }}
+        securityContext:
+          # run as root to set ownership
+          runAsUser: 0
+        volumeMounts:
+          - name: sites-dir
+            mountPath: /home/frappe/frappe-bench/sites
+      restartPolicy: Never
+      volumes:
+        - name: sites-dir
+          {{- if .Values.persistence.worker.enabled }}
+          persistentVolumeClaim:
+            {{- if .Values.persistence.worker.existingClaim }}
+            claimName: {{ .Values.persistence.worker.existingClaim }}
+            {{- else }}
+            claimName: {{ template "erpnext.fullname" . }}
+            {{- end }}
+            readOnly: false
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.jobs.volumePermissions.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.jobs.volumePermissions.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.jobs.volumePermissions.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

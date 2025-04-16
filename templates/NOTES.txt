@@ -1,0 +1,2 @@
+Release Name: {{ include "erpnext.fullname" . }}
+

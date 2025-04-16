@@ -1,0 +1,201 @@
+{{- if .Values.jobs.createSite.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "erpnext.fullname" . }}-new-site
+  labels:
+    {{- include "erpnext.labels" . | nindent 4 }}
+  {{- if .Values.jobs.createSite.annotations }}
+  {{- with .Values.jobs.createSite.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end}}
+spec:
+  backoffLimit: {{ .Values.jobs.createSite.backoffLimit }}
+  template:
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      serviceAccountName: {{ template "erpnext.serviceAccountName" $ }}
+      securityContext:
+        {{- toYaml $.Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: validate-config
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["bash", "-c"]
+          args:
+            - >
+              export start=`date +%s`;
+              until [[ -n `grep -hs ^ sites/common_site_config.json | jq -r ".db_host // empty"` ]] && \
+                [[ -n `grep -hs ^ sites/common_site_config.json | jq -r ".redis_cache // empty"` ]] && \
+                [[ -n `grep -hs ^ sites/common_site_config.json | jq -r ".redis_queue // empty"` ]];
+              do
+                echo "Waiting for sites/common_site_config.json to be created";
+                sleep 5;
+                if (( `date +%s`-start > 600 )); then
+                  echo "could not find sites/common_site_config.json with required keys";
+                  exit 1
+                fi
+              done;
+              echo "sites/common_site_config.json found";
+              echo "Waiting for database to be reachable...";
+              wait-for-it -t 180 $(DB_HOST):$(DB_PORT);
+              echo "Database is reachable.";
+          env:
+            - name: "DB_HOST"
+              {{- if .Values.mariadb.enabled }}
+              {{- if eq .Values.mariadb.architecture "replication" }}
+              value: {{ .Release.Name }}-mariadb-primary
+              {{- else }}
+              value: {{ .Release.Name }}-mariadb
+              {{- end }}
+              {{- else }}
+              value: "{{ .Values.dbHost }}"
+              {{- end }}
+            - name: "DB_PORT"
+              {{- if .Values.dbPort }}
+              value: {{ .Values.dbPort | quote }}
+              {{- else }}
+              value: {{ .Values.mariadb.primary.service.ports.mysql | quote }}
+              {{- end }}
+          resources:
+            {{- toYaml .Values.jobs.createSite.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml $.Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: sites-dir
+              mountPath: /home/frappe/frappe-bench/sites
+      containers:
+      - name: create-site
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["bash", "-c"]
+        args:
+          - |
+            {{- range .Values.sitesConfig }}
+
+            if [ "{{ .enabled }}" = "true" ]; then
+
+              echo "Creating site {{ .siteName }}" && \
+              
+              if [ ! -d "/home/frappe/frappe-bench/sites/{{ .siteName }}" ] || [ "{{ .forceCreate }}" = "true" ]; then
+                bench new-site {{ .siteName }} \
+                  --no-mariadb-socket \
+                  --db-type=$(DB_TYPE) \
+                  --db-host=$(DB_HOST) \
+                  --db-port=$(DB_PORT) \
+                  --db-name={{ .dbName }} \
+                  --db-password=$(DB_ROOT_PASSWORD) \
+                  --admin-password=$(ADMIN_PASSWORD) \
+                  --mariadb-root-username=$(DB_ROOT_USER) \
+                  --mariadb-root-password=$(DB_ROOT_PASSWORD) \
+                  {{- if .installApps }}
+                    {{- range .installApps }}
+                  --install-app={{ . }} \
+                    {{- end }}
+                  {{- end }}
+                  {{- if .forceCreate }}
+                  --force
+                  {{- end }}
+                  # Dummy comment to break line continuation
+              else
+                echo "Site {{ .siteName }} already exists, skipping creation."
+              fi
+            fi
+            {{- end }}
+            rm -f currentsite.txt;
+        env:
+          - name: "DB_TYPE"
+            value: {{ .Values.jobs.createSite.dbType }}
+          - name: "DB_HOST"
+            {{- if .Values.mariadb.enabled }}
+            {{- if eq .Values.mariadb.architecture "replication" }}
+            value: {{ .Release.Name }}-mariadb-primary
+            {{- else }}
+            value: {{ .Release.Name }}-mariadb
+            {{- end }}
+            {{- else }}
+            value: "{{ .Values.dbHost }}"
+            {{- end }}
+          - name: "DB_PORT"
+            {{- if .Values.dbPort }}
+            value: {{ .Values.dbPort | quote }}
+            {{- else }}
+            value: {{ .Values.mariadb.primary.service.ports.mysql | quote }}
+            {{- end }}
+          - name: "DB_ROOT_USER"
+            {{- if .Values.dbRootUser }}
+            value: "{{ .Values.dbRootUser }}"
+            {{- else if .Values.mariadb.enabled }}
+            value: "root"
+            {{- end }}
+          - name: "DB_ROOT_PASSWORD"
+            {{- if .Values.secretproviderclass.enabled }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.secretproviderclass.secretName }}
+                key: db-root-password
+            {{- else if .Values.dbRootPassword }}
+            valueFrom:
+              secretKeyRef:
+                key:  db-root-password
+                name: {{ .Release.Name }}
+            {{- else if .Values.mariadb.enabled }}
+            valueFrom:
+              secretKeyRef:
+                key: mariadb-root-password
+                name: {{ .Release.Name }}-mariadb
+            {{- end }}
+          - name: "ADMIN_PASSWORD"
+            value: "{{ .Values.jobs.createSite.adminPassword }}"
+        resources:
+          {{- toYaml .Values.jobs.createSite.resources | nindent 10 }}
+        securityContext:
+          {{- toYaml $.Values.securityContext | nindent 10 }}
+        volumeMounts:
+          - name: sites-dir
+            mountPath: /home/frappe/frappe-bench/sites
+          {{- if .Values.secretproviderclass.enabled }}
+          - name: secrets-store-inline
+            mountPath: "/mnt/secrets-store"
+            readOnly: true
+          {{- end }}
+      restartPolicy: Never
+      volumes:
+        {{- if .Values.secretproviderclass.enabled }}
+        - name: secrets-store-inline
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: {{ .Values.secretproviderclass.SecretProviderName }}
+        {{- end }}
+        - name: sites-dir
+          {{- if .Values.persistence.worker.enabled }}
+          persistentVolumeClaim:
+            {{- if .Values.persistence.worker.existingClaim }}
+            claimName: {{ .Values.persistence.worker.existingClaim }}
+            {{- else }}
+            claimName: {{ template "erpnext.fullname" . }}
+            {{- end }}
+            readOnly: false
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.jobs.createSite.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.jobs.createSite.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.jobs.createSite.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

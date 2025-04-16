@@ -1,0 +1,97 @@
+{{- if .Values.jobs.migrate.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "erpnext.fullname" . }}-migrate
+  labels:
+    {{- include "erpnext.labels" . | nindent 4 }}
+  {{- if .Values.jobs.migrate.annotations }}
+  {{- with .Values.jobs.migrate.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end}}
+spec:
+  backoffLimit: {{ .Values.jobs.migrate.backoffLimit }}
+  template:
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      serviceAccountName: {{ template "erpnext.serviceAccountName" $ }}
+      securityContext:
+        {{- toYaml $.Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: migrate
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["bash", "-c"]
+        args:
+          - >
+            ls -1 apps > sites/apps.txt;
+            {{- range .Values.sitesConfig }}
+            
+              {{- $siteName := .siteName }}
+              {{- $skipFailing := $.Values.jobs.migrate.skipFailing | default false }}
+
+              if [ -d "sites/{{ $siteName }}" ]; then
+
+                echo "Migrating {{ $siteName }}";
+                bench --site {{ $siteName }} set-maintenance-mode on;
+
+                {{- if .installApps }}
+                  {{- range .installApps }}
+                    bench --site {{ $siteName }} install-app {{ . }};
+                  {{- end }}
+                {{- end }}
+
+                bench --site {{ $siteName }} migrate {{ if $skipFailing }}--skip-failing{{ end }};
+                bench --site {{ $siteName }} set-maintenance-mode off;
+
+              else
+                echo "Site {{ $siteName }} does not exist. Skipping."
+              fi
+            {{- end }}
+            sleep 5;
+            {{- if index .Values "jobs" "migrate" "postMigrateCommands" }}
+              echo "Running post-migration commands";
+              {{- range .Values.jobs.migrate.postMigrateCommands }}
+                {{ . }};
+              {{- end }}
+            {{- end }}
+        env: []
+        resources:
+          {{- toYaml .Values.jobs.migrate.resources | nindent 10 }}
+        securityContext:
+          {{- toYaml $.Values.securityContext | nindent 10 }}
+        volumeMounts:
+          - name: sites-dir
+            mountPath: /home/frappe/frappe-bench/sites
+      restartPolicy: Never
+      volumes:
+        - name: sites-dir
+          {{- if .Values.persistence.worker.enabled }}
+          persistentVolumeClaim:
+            {{- if .Values.persistence.worker.existingClaim }}
+            claimName: {{ .Values.persistence.worker.existingClaim }}
+            {{- else }}
+            claimName: {{ template "erpnext.fullname" . }}
+            {{- end }}
+            readOnly: false
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.jobs.migrate.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.jobs.migrate.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.jobs.migrate.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

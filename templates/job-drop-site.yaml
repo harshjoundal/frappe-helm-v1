@@ -1,0 +1,117 @@
+{{- if .Values.jobs.dropSite.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "erpnext.fullname" . }}-drop-site
+  labels:
+    {{- include "erpnext.labels" . | nindent 4 }}
+  {{- if .Values.jobs.dropSite.annotations }}
+  {{- with .Values.jobs.dropSite.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end}}
+spec:
+  backoffLimit: {{ .Values.jobs.dropSite.backoffLimit }}
+  template:
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      serviceAccountName: {{ template "erpnext.serviceAccountName" $ }}
+      securityContext:
+        {{- toYaml $.Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: drop-site
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["bash", "-c"]
+        args:
+          - |
+            if [ -d "sites/$(SITE_NAME)" ]; then
+              bench drop-site \
+                --root-login=$DB_ROOT_USER \
+                --root-password=$DB_ROOT_PASSWORD \
+                --archived-sites-path=archived_sites \
+                --no-backup \
+              {{- if .Values.jobs.dropSite.forced }}
+                --force \
+              {{- end }}
+                $(SITE_NAME)
+            else
+              echo "Site $(SITE_NAME) does not exist. Skipping."
+            fi
+        env:
+          - name: "SITE_NAME"
+            value: "{{ .Values.jobs.dropSite.siteName }}"
+          - name: "DB_ROOT_USER"
+            {{- if .Values.mariadb.enabled }}
+            value: "root"
+            {{- else }}
+            value: "{{ .Values.dbRootUser }}"
+            {{- end }}
+          - name: "DB_ROOT_PASSWORD"
+            {{- if .Values.secretproviderclass.enabled }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.secretproviderclass.secretName }}
+                key: db-root-password
+            {{- else if .Values.mariadb.enabled }}
+            valueFrom:
+              secretKeyRef:
+                key: mariadb-root-password
+                name: {{ .Release.Name }}-mariadb
+            {{- else }}
+            valueFrom:
+              secretKeyRef:
+                key:  db-root-password
+                name: {{ .Release.Name }}
+            {{- end }}
+        resources:
+          {{- toYaml .Values.jobs.dropSite.resources | nindent 12 }}
+        securityContext:
+          {{- toYaml $.Values.securityContext | nindent 12 }}
+        volumeMounts:
+          - name: sites-dir
+            mountPath: /home/frappe/frappe-bench/sites
+          {{- if .Values.secretproviderclass.enabled }}
+          - name: secrets-store-inline
+            mountPath: "/mnt/secrets-store"
+            readOnly: true
+          {{- end }}
+      restartPolicy: Never
+      volumes:
+        {{- if .Values.secretproviderclass.enabled }}
+        - name: secrets-store-inline
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: {{ .Values.secretproviderclass.SecretProviderName }}
+        {{- end }}
+        - name: sites-dir
+          {{- if .Values.persistence.worker.enabled }}
+          persistentVolumeClaim:
+            {{- if .Values.persistence.worker.existingClaim }}
+            claimName: {{ .Values.persistence.worker.existingClaim }}
+            {{- else }}
+            claimName: {{ template "erpnext.fullname" . }}
+            {{- end }}
+            readOnly: false
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.jobs.dropSite.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.jobs.dropSite.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.jobs.dropSite.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

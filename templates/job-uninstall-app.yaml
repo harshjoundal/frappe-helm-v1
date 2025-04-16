@@ -1,0 +1,86 @@
+{{- if .Values.jobs.uninstallApps }}
+{{- if and .Values.jobs.uninstallApps.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  {{- if .Values.jobs.uninstallApps.jobName }}
+  name: {{ .Values.jobs.uninstallApps.jobName }}
+  {{- else }}
+  name: {{ template "erpnext.fullname" . }}-uninstall-app
+  {{- end }}
+  labels:
+    {{- include "erpnext.labels" . | nindent 4 }}
+  {{- if .Values.jobs.uninstallApps.annotations }}
+  {{- with .Values.jobs.uninstallApps.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end}}
+spec:
+  backoffLimit: {{ .Values.jobs.uninstallApps.backoffLimit }}
+  template:
+    metadata:
+      labels:
+        {{- include "erpnext.labels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ template "erpnext.serviceAccountName" $ }}
+      securityContext:
+        {{- toYaml $.Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: uninstall-apps
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["bash", "-c"]
+          args:
+            - >
+              {{- range .Values.sitesConfig }}
+              {{- $siteName := .siteName }}
+              {{- $skipFailing := $.Values.jobs.migrate.skipFailing | default false }}
+              echo "{{ .siteName }}"
+                {{- if .uninstallApps }}
+                  {{- range .uninstallApps }}
+                    bench --site {{ $siteName }} uninstall-app --no-backup {{ . }} {{if $.Values.jobs.uninstallApps.forced }}--force{{end}} -y;
+                  {{- end}}
+                  bench --site {{ $siteName }} clear-cache;
+                {{- end}}
+              {{- end}}
+          env: []
+          resources:
+            {{- toYaml .Values.jobs.uninstallApps.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml $.Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: sites-dir
+              mountPath: /home/frappe/frappe-bench/sites
+      restartPolicy: Never
+      volumes:
+        - name: sites-dir
+          {{- if .Values.persistence.worker.enabled }}
+          persistentVolumeClaim:
+            {{- if .Values.persistence.worker.existingClaim }}
+            claimName: {{ .Values.persistence.worker.existingClaim }}
+            {{- else }}
+            claimName: {{ template "erpnext.fullname" . }}
+            {{- end }}
+            readOnly: false
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.jobs.uninstallApps.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.jobs.uninstallApps.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.jobs.uninstallApps.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+{{- end }}

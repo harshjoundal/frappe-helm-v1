@@ -1,0 +1,78 @@
+{{- if .Values.jobs.backup.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "erpnext.fullname" . }}-backup
+  labels:
+    {{- include "erpnext.labels" . | nindent 4 }}
+  {{- if .Values.jobs.backup.annotations }}
+  {{- with .Values.jobs.backup.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end}}
+spec:
+  backoffLimit: {{ .Values.jobs.backup.backoffLimit }}
+  template:
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      serviceAccountName: {{ template "erpnext.serviceAccountName" $ }}
+      securityContext:
+        {{- toYaml $.Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: backup
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["bash", "-c"]
+        args:
+          - >
+            {{- range .Values.sitesConfig }}
+              {{- if .backup.enabled }}
+                bench --site={{ .siteName }}
+                {{- if $.Values.jobs.backup.withFiles }}
+                backup --with-files;
+                {{- else }}
+                backup;
+                {{- end }}
+              {{- else}}
+                echo "Backup is disabled for {{ .siteName }}";
+              {{- end}}
+            {{- end}}
+        env: []
+        resources:
+          {{- toYaml .Values.jobs.backup.resources | nindent 10 }}
+        securityContext:
+          {{- toYaml $.Values.securityContext | nindent 10 }}
+        volumeMounts:
+          - name: sites-dir
+            mountPath: /home/frappe/frappe-bench/sites
+      restartPolicy: Never
+      volumes:
+        - name: sites-dir
+          {{- if .Values.persistence.worker.enabled }}
+          persistentVolumeClaim:
+            {{- if .Values.persistence.worker.existingClaim }}
+            claimName: {{ .Values.persistence.worker.existingClaim }}
+            {{- else }}
+            claimName: {{ template "erpnext.fullname" . }}
+            {{- end }}
+            readOnly: false
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.jobs.backup.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.jobs.backup.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.jobs.backup.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
