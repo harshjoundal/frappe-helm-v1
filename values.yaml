@@ -11,6 +11,10 @@
 # dbRootPassword: ""
 # dbRds: true
 
+nameOverride: "erpnext" # this will be used as label eg.app.kubernetes.io/name: {{ include "erpnext.name" . }}-worker-l
+fullnameOverride: "erpnext"  # this will be used as a prefix for the resource name 
+
+
 secretproviderclass:
   enabled: false
   SecretProviderName: "erpnext-spc"
