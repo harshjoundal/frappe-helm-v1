@@ -28,7 +28,7 @@ secretproviderclass:
 
 image:
   repository:  harshjoundal7/frappelms
-  tag: v1
+  tag: v2
   pullPolicy: IfNotPresent
 
 # Any new site added in sitesConfig will be created while new-site jobs runs automatically
@@ -44,8 +44,9 @@ sitesConfig:
     # while site migration 
     installApps:
       - erpnext
-    uninstallApps: #These apps will be uninstalled when uninstallApps job runs
-      - helpdesk
+      - special_ops_frappe_utilities
+      - frappe_external_solutions
+    uninstallApps: [] #These apps will be uninstalled when uninstallApps job runs
     backup: # If enabled site will be backed up while backup job runs
       enabled: false
 
@@ -131,6 +132,7 @@ worker:
     nodeSelector: {}
     annotations:
       scheduling.cast.ai/spot-percentage: "70"
+      harsh: "hehe"
     tolerations: []
     affinity: {}
     args: []
