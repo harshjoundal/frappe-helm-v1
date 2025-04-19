@@ -28,7 +28,7 @@ secretproviderclass:
 
 image:
   repository:  harshjoundal7/frappelms
-  tag: v3
+  tag: v4
   pullPolicy: IfNotPresent
 
 # Any new site added in sitesConfig will be created while new-site jobs runs automatically
