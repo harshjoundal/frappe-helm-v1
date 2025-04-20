@@ -57,7 +57,7 @@ commonEnvVars: &commonEnvVars
     value: "erpnext-dev"
 
 nginx:
-  replicaCount: 2
+  replicaCount: 10
   autoscaling:
     enabled: false
     minReplicas: 1
@@ -102,11 +102,11 @@ nginx:
 
 worker:
   gunicorn:
-    replicaCount: 2
+    replicaCount: 10
     autoscaling:
       enabled: true
-      minReplicas: 2
-      maxReplicas: 5
+      minReplicas: 10
+      maxReplicas: 15
       targetCPU: 75
       targetMemory: 75
     livenessProbe:
