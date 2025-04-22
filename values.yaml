@@ -91,7 +91,7 @@ nginx:
     limits:
       cpu: 1000m
       memory: 1Gi
-  annotations:
+  podAnnotations:
     scheduling.cast.ai/spot-percentage: "70"
   nodeSelector: {}
   tolerations: []
@@ -130,7 +130,7 @@ worker:
         cpu: 1000m
         memory: 1Gi
     nodeSelector: {}
-    annotations:
+    podAnnotations:
       scheduling.cast.ai/spot-percentage: "70"
       harsh: "hehe"
     tolerations: []
@@ -149,7 +149,7 @@ worker:
       targetCPU: 75
       targetMemory: 75
     resources: {}
-    annotations:
+    podAnnotations:
       scheduling.cast.ai/spot-percentage: "70"
     nodeSelector: {}
     tolerations: []
@@ -173,7 +173,7 @@ worker:
       targetCPU: 75
       targetMemory: 75
     resources: {}
-    annotations:
+    podAnnotations:
       scheduling.cast.ai/spot-percentage: "70"
     nodeSelector: {}
     tolerations: []
@@ -197,7 +197,7 @@ worker:
       targetCPU: 75
       targetMemory: 75
     resources: {}
-    annotations:
+    podAnnotations:
       scheduling.cast.ai/spot-percentage: "70"
     nodeSelector: {}
     tolerations: []
@@ -215,7 +215,7 @@ worker:
   scheduler:
     replicaCount: 1
     resources: {}
-    annotations:
+    podAnnotations:
       scheduling.cast.ai/spot-percentage: "70"
     nodeSelector: {}
     tolerations: []
@@ -277,7 +277,7 @@ socketio:
     initialDelaySeconds: 5
     periodSeconds: 10
   resources: {}
-  annotations:
+  podAnnotations:
     scheduling.cast.ai/spot-percentage: "70"
   nodeSelector: {}
   tolerations: []
