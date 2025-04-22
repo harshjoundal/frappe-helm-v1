@@ -4,12 +4,6 @@ metadata:
   name: {{ include "erpnext.fullname" . }}-worker-l
   labels:
     {{- include "erpnext.labels" . | nindent 4 }}
-  {{- if .Values.worker.long.annotations }}
-  {{- with .Values.worker.long.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-  {{- end}}
 spec:
   replicas: {{ .Values.worker.long.replicaCount }}
   selector:
@@ -21,6 +15,12 @@ spec:
       labels:
         app.kubernetes.io/name: {{ include "erpnext.name" . }}-worker-l
         app.kubernetes.io/instance: {{ .Release.Name }}-worker-l
+    {{- if .Values.worker.long.podAnnotations }}
+      {{- with .Values.worker.long.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- end }}
     spec:
     {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
